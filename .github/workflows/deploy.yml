@@ -16,7 +16,7 @@ jobs:
       - name: Setup NodeJS
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Install Backend Dependencies
         run: |
@@ -25,7 +25,9 @@ jobs:
 
       - name: Restart PM2 Backend
         run: |
-          pm2 restart server
+          cd backend
+          pm2 delete server --silent
+          pm2 start server.js --name server
 
       - name: Build Frontend
         run: |
