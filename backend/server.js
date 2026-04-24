@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const http = require('http');
+const path = require('path');
+const fs = require('fs');
 const { Server } = require('socket.io');
 const cron = require('node-cron');
 const sequelize = require('./db/sequelize');
@@ -36,6 +38,22 @@ app.use('/api/report', require('./routes/report'));
 app.use('/api/packing', require('./routes/packing'));
 app.use('/api/targets', require('./routes/targets'));
 app.use('/api/system', require('./routes/system'));
+
+const frontendDistPath = path.resolve("C:/Users/IOT1/Desktop/Bawal traceability Rear/Dashboard/frontend/dist");
+const frontendIndexPath = path.join(frontendDistPath, 'index.html');
+
+console.log("Frontend path:", frontendDistPath);
+console.log("Index exists:", fs.existsSync(frontendIndexPath));
+// const frontendIndexPath = path.join(frontendDistPath, 'index.html');
+const hasFrontendBuild = fs.existsSync(frontendIndexPath);
+
+if (hasFrontendBuild) {
+  app.use(express.static(frontendDistPath));
+
+  app.get(/^\/(?!api|socket\.io).*/, (_req, res) => {
+    res.sendFile(frontendIndexPath);
+  });
+}
 
 let autoPackTask = null;
 let shuttingDown = false;

@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: traceability-deploy
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: self-hosted
@@ -12,28 +16,68 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          clean: false
+          fetch-depth: 1
+
+      - name: Verify Local Environment Files
+        run: |
+          if (!(Test-Path "backend/.env")) {
+            throw "Missing backend/.env on the deployment machine. Deployment stopped to avoid breaking login or database connectivity."
+          }
+
+          if (!(Test-Path "frontend/.env")) {
+            throw "Missing frontend/.env on the deployment machine. Deployment stopped to avoid building with the wrong API or socket URL."
+          }
 
       - name: Setup NodeJS
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
       - name: Install Backend Dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build Frontend
+        run: npm run build
+        working-directory: frontend
+
+      - name: Verify Frontend Build Output
         run: |
-          cd backend
-          npm install
+          if (!(Test-Path "frontend/dist/index.html")) {
+            throw "Frontend build completed without generating frontend/dist/index.html."
+          }
 
       - name: Restart PM2 Backend
         run: |
-          cd backend
-          pm2 delete server --silent
-          pm2 start server.js --name server
+          pm2 startOrRestart ecosystem.config.cjs --only dashboard-backend
+          pm2 save
 
-      - name: Build Frontend
+      - name: Show PM2 Status
+        run: pm2 status
+
+      - name: Verify API Health
         run: |
-          cd frontend
-          npm install
-          npm run build
+          $response = Invoke-WebRequest -Uri "http://127.0.0.1:5000/api/system/status" -UseBasicParsing
+          if ($response.StatusCode -ne 200) {
+            throw "API health check failed with status $($response.StatusCode)."
+          }
+
+      - name: Verify App Root
+        run: |
+          $response = Invoke-WebRequest -Uri "http://127.0.0.1:5000/" -UseBasicParsing
+          if ($response.StatusCode -ne 200) {
+            throw "App root check failed with status $($response.StatusCode)."
+          }
 
       - name: Done
         run: echo 'Deployed Successfully!'

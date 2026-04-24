@@ -12,7 +12,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 5000,
-        BIND_HOST: '127.0.0.1',
+        BIND_HOST: '0.0.0.0',
         CORS_ORIGIN: '*',
       },
     },
